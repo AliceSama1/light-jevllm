@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jev-runtime"
+version = "0.1.0"
+description = "Standalone strict token-logit decision HTTP runtime"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+jev-runtime = "jev_runtime.cli:main"

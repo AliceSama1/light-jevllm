@@ -1,0 +1,207 @@
+openapi: 3.1.0
+info:
+  title: Jev standalone decision runtime
+  version: 0.1.0
+  description: Strict text-only subset of the reference decision API. No media, presets or multi-state extensions.
+paths:
+  /v1/decisions:
+    post:
+      operationId: decisions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Request'}
+      responses:
+        '200':
+          description: Decisions
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - {$ref: '#/components/schemas/Response'}
+                  - {$ref: '#/components/schemas/NativeResponse'}
+        '400': {description: Invalid JSON or schema}
+        '413': {description: Request exceeds one MiB}
+        '429': {description: Admission or connection capacity exhausted}
+        '500': {description: Internal server error}
+        '502': {description: Upstream error or incomplete candidate logprobs}
+        '503': {description: Runtime not ready or closing}
+        '504': {description: Deadline exceeded; underlying socket is not claimed cancelled}
+  /v1/systemone:
+    post:
+      operationId: systemone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Request'}
+      responses:
+        '200':
+          description: Same semantics and response as decisions
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - {$ref: '#/components/schemas/Response'}
+                  - {$ref: '#/components/schemas/NativeResponse'}
+        '400': {description: Invalid request}
+        '413': {description: Body too large}
+        '429': {description: Capacity exhausted}
+        '500': {description: Internal server error}
+        '502': {description: Upstream failure}
+        '503': {description: Not ready}
+        '504': {description: Deadline exceeded}
+  /v1/models:
+    get:
+      responses:
+        '200': {description: OpenAI-style list with served id, family, backend and capabilities (question kinds, confidence_type, supports_request_batching depends on coalesced mode, policy_mode)}
+        '503': {description: Runtime closing}
+  /health:
+    get:
+      responses:
+        '200': {description: Loaded and upstream model is available}
+        '503': {description: Closing or upstream unavailable}
+  /health/live:
+    get:
+      responses:
+        '200': {description: HTTP process alive}
+  /metrics:
+    get:
+      responses:
+        '200': {description: Prometheus request/rejection/error counters, request byte/question cost counters, queue wait seconds, queue depth, running and active gauges; cache hits/misses and executed batch/forward counters}
+components:
+  schemas:
+    Request:
+      type: object
+      additionalProperties: false
+      required: [state, questions]
+      properties:
+        model: {type: string, minLength: 1}
+        state: {}
+        questions:
+          type: object
+          minProperties: 1
+          maxProperties: 64
+          propertyNames: {type: string, minLength: 1}
+          additionalProperties: {$ref: '#/components/schemas/Question'}
+        options:
+          type: object
+          additionalProperties: false
+          properties:
+            deadline_ms: {type: number, exclusiveMinimum: 0}
+    Question:
+      type: object
+      additionalProperties: false
+      required: [type, instructions]
+      properties:
+        type: {enum: [choice, score, noul]}
+        instructions:
+          oneOf:
+            - {type: string, pattern: '\\S'}
+            - {type: object}
+            - {type: array}
+        criteria:
+          description: Choice requires 2..255 nonblank keys; noul optionally supplies exactly true and false; score requires 2..10 descriptions, numbered from zero.
+          oneOf:
+            - type: object
+              minProperties: 2
+              maxProperties: 255
+              additionalProperties: {}
+            - type: array
+              minItems: 2
+              maxItems: 10
+              items: {}
+        token_labels:
+          type: object
+          description: Optional complete candidate-id to single-token label mapping; default candidate IDs. Labels and token IDs must be unique.
+          additionalProperties: {type: string, minLength: 1}
+      allOf:
+        - if: {properties: {type: {const: choice}}}
+          then:
+            required: [criteria]
+            properties: {criteria: {type: object, propertyNames: {pattern: '\\S'}}}
+        - if: {properties: {type: {const: score}}}
+          then:
+            required: [criteria]
+            properties: {criteria: {type: array}}
+        - if: {properties: {type: {const: noul}}}
+          then:
+            properties:
+              criteria:
+                type: object
+                required: ['true', 'false']
+                additionalProperties: false
+                properties: {'true': {}, 'false': {}}
+    Response:
+      type: object
+      additionalProperties: false
+      required: [model, answers, usage]
+      properties:
+        model: {type: string}
+        answers:
+          type: object
+          additionalProperties: {$ref: '#/components/schemas/Answer'}
+        usage:
+          type: object
+          description: Question count only; no fabricated upstream token counts.
+          additionalProperties: false
+          required: [questions]
+          properties: {questions: {type: integer}}
+    Answer:
+      type: object
+      additionalProperties: false
+      required: [type, probabilities, confidence, confidence_type, calibration_version]
+      properties:
+        type: {enum: [choice, score, noul]}
+        choice: {type: string}
+        score: {type: number}
+        noul: {type: number, minimum: 0, maximum: 1, description: 'P(true), never a boolean'}
+        probabilities: {type: object, additionalProperties: {type: number, minimum: 0, maximum: 1}}
+        confidence: {type: number, minimum: 0, maximum: 1}
+        confidence_type: {const: normalized_entropy}
+        calibration_version: {type: [string, 'null'], description: Null at default temperature 1; explicit version required for non-unit temperature}
+        legend: {type: object, additionalProperties: {type: string}}
+      allOf:
+        - if: {properties: {type: {const: choice}}}
+          then: {required: [choice]}
+        - if: {properties: {type: {const: score}}}
+          then: {required: [score, legend]}
+        - if: {properties: {type: {const: noul}}}
+          then: {required: [noul]}
+    NativeResponse:
+      type: object
+      additionalProperties: false
+      required: [model, answers, usage]
+      description: Native backend only. Answers, usage and optional meta retain upstream semantics. No entropy confidence or calibration fields are synthesized. Local model alias replaces upstream model.
+      properties:
+        model: {type: string}
+        meta: {}
+        usage: {type: object}
+        answers:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            required: [type]
+            properties:
+              type: {enum: [choice, noul, score]}
+              choice: {type: string}
+              noul: {type: number, minimum: 0, maximum: 1}
+              score: {type: number}
+              probabilities: {type: object, additionalProperties: {type: number, minimum: 0, maximum: 1}}
+              confidence: {type: number, minimum: 0, maximum: 1}
+              legend: {type: object}
+              error: {type: string, minLength: 1}
+              message: {}
+            allOf:
+              - if: {not: {required: [error]}}
+                then:
+                  required: [probabilities, confidence]
+                  allOf:
+                    - if: {properties: {type: {const: choice}}}
+                      then: {required: [choice]}
+                    - if: {properties: {type: {const: noul}}}
+                      then: {required: [noul]}
+                    - if: {properties: {type: {const: score}}}
+                      then: {required: [score, legend]}

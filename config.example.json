@@ -1,0 +1,18 @@
+{
+  "model": "my-served-model",
+  "upstream_url": "http://127.0.0.1:8000",
+  "upstream_model": "my-vllm-model",
+  "tokenizer_json": "./tokenizer.json",
+  "family": "token_logit",
+  "backend": "vllm_http",
+  "policy_mode": "reference",
+  "metrics_namespace": "jev",
+  "host": "127.0.0.1",
+  "port": 8080,
+  "allow_nonlocal_bind": false,
+  "workers": 4,
+  "queue_capacity": 16,
+  "timeout_seconds": 30,
+  "close_timeout_seconds": 5,
+  "max_request_bytes": 1048576
+}
