@@ -1,9 +1,8 @@
-# Jev-Decision runtime architecture notes
+# light-jevllm architecture notes
 
 ## Scope
 
-The formal implementation remains `vllm_srun`. `openjev-main` and `dzyy-vllm-main`
-are read-only references; neither is imported or modified by the runtime.
+The formal implementation is `light-jevllm` (Python compatibility package: `jev_runtime`). `vllm_srun` is a legacy/reference implementation; `openjev-main` and `dzyy-vllm-main` are read-only references and are neither imported nor modified by light-jevllm.
 
 ## Boundaries
 

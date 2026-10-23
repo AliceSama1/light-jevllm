@@ -1,9 +1,6 @@
-# Decision intermediate representation
+# light-jevllm Decision intermediate representation
 
-This document defines the first compatible IR for the Jev/Decision runtime. It
-is deliberately additive: current families continue to construct
-`RenderedItem` and `RequestPlan`, while new families can attach the richer
-metadata below.
+This document defines the first compatible IR for light-jevllm Jev/Decision services. It is deliberately additive: current families continue to construct `RenderedItem` and `RequestPlan`, while new families can attach the richer metadata below.
 
 ## Flow
 
@@ -17,7 +14,7 @@ does not inspect Vega, encoder or DiffusionGemma details.
 
 ## Types
 
-The canonical Python definitions live in `vllm_srun/decision_ir.py`.
+The canonical Python definitions live in `jev_runtime/decision_ir.py` (with the compatibility core extensions in `jev_runtime/core/ir.py`).
 
 - `DecisionRequest`: validated model, state, questions, media and runtime
   options. It is transport-neutral and contains no tensors.

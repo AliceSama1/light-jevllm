@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Jev standalone decision runtime
+  title: light-jevllm
   version: 0.1.0
   description: Strict text-only subset of the reference decision API. No media, presets or multi-state extensions.
 paths:
@@ -22,7 +22,7 @@ paths:
                   - {$ref: '#/components/schemas/Response'}
                   - {$ref: '#/components/schemas/NativeResponse'}
         '400': {description: Invalid JSON or schema}
-        '413': {description: Request exceeds one MiB}
+        '413': {description: Request exceeds configured limit (maximum 8 MiB)}
         '429': {description: Admission or connection capacity exhausted}
         '500': {description: Internal server error}
         '502': {description: Upstream error or incomplete candidate logprobs}
@@ -52,6 +52,11 @@ paths:
         '502': {description: Upstream failure}
         '503': {description: Not ready}
         '504': {description: Deadline exceeded}
+  /openapi.yaml:
+    get:
+      responses:
+        '200': {description: OpenAPI contract, content: {application/yaml: {schema: {type: string}}}}
+        '404': {description: Contract unavailable}
   /v1/models:
     get:
       responses:

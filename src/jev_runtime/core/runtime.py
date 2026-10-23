@@ -35,7 +35,7 @@ class Runtime:
             tokenizer=Tokenizer.from_file(str(path)); encode=lambda text: tokenizer.encode(text,add_special_tokens=False).ids
         self.model=typed.model
         self.backend_name=typed.backend
-        self.family=FAMILIES.create(typed.family,encode) if typed.backend != 'vllm_systemone' else None
+        self.family=FAMILIES.create(typed.family,encode, temperature=typed.temperature, calibration_version=typed.calibration_version) if typed.backend != 'vllm_systemone' else None
         if typed.backend == 'vllm_systemone':
             self.backend=BACKENDS.create(typed.backend, VLLMSystemOneOptions(typed.upstream_url, model=typed.upstream_model, timeout_seconds=self.timeout, max_concurrency=self.workers))
         else:
@@ -180,8 +180,16 @@ class Runtime:
     def metrics(self):
         with self.condition:
             prefix=self.config.metrics_namespace
-            for name,value in {'queue_depth':self.queued,'running':self.running,'active':self.active,'closing':int(self.closed),'batching_executed':0}.items():
+            for name,value in {'queue_depth':self.queued,'running':self.running,'active':self.active}.items():
                 self.metrics_sink.gauge(prefix+'_'+name,value)
+            batch_stats = getattr(self.scheduler, 'stats', lambda: {})()
+            for name, value in batch_stats.items():
+                self.metrics_sink.gauge(prefix+'_'+name, value)
+            cache_stats = self.result_cache.store.stats() if self.result_cache is not None else None
+            if cache_stats is not None:
+                for name in ('entries', 'size', 'evictions', 'hits', 'misses'):
+                    self.metrics_sink.gauge(prefix+'_cache_'+name, getattr(cache_stats, name))
+            self.metrics_sink.gauge(prefix+'_closing',int(self.closed))
             self.metrics_sink.gauge(prefix+'_policy_mode',1,{'mode':self.config.policy_mode})
             render=getattr(self.metrics_sink,'render',None)
             text=render() if callable(render) else ''

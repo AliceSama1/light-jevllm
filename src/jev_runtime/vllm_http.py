@@ -40,7 +40,7 @@ class VLLMHTTPBackend:
         self.options = options
         self._custom_transport = transport
         self._transport = transport or self._urllib_transport
-        self._executor = None if transport else ThreadPoolExecutor(max_workers=max(1, options.max_concurrency), thread_name_prefix="jev-upstream")
+        self._executor = None if transport else ThreadPoolExecutor(max_workers=max(1, options.max_concurrency), thread_name_prefix="light-jevllm-upstream")
         self._lock = threading.Lock()
         self.closed = False
 

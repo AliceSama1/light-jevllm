@@ -3,7 +3,10 @@ from ..core.errors import ServiceError, object_fields
 from ..token_logit import TokenLogitAdapter
 from ..decision_ir import Candidate
 class TokenLogitFamily:
-    def __init__(self, encode): self.adapter, self.closed = TokenLogitAdapter(encode), False
+    def __init__(self, encode, *, temperature: float = 1.0, calibration_version: str | None = None):
+        self.adapter, self.closed = TokenLogitAdapter(encode), False
+        self.temperature = temperature
+        self.calibration_version = calibration_version
     def compile(self, request):
         if self.closed: raise ServiceError(503, 'runtime closing')
         questions=request['questions']
@@ -33,5 +36,10 @@ class TokenLogitFamily:
             items.append(self.adapter.compile(name,kind,prompt,[Candidate(k,labels[k],v) for k,v in criteria.items()]))
         return items
     def readout(self, items, output):
-        return {item.question.id: self.adapter.decode(item,[row[k] for k in item.candidate_ids]) for item,row in zip(items,output,strict=True)}
+        return {item.question.id: self.adapter.decode(
+            item,
+            [row[k] for k in item.candidate_ids],
+            temperature=self.temperature,
+            calibration_version=self.calibration_version,
+        ) for item,row in zip(items,output,strict=True)}
     def close(self): self.closed=True

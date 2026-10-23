@@ -57,7 +57,7 @@ class RuntimeConfig:
         if self.result_cache and not (self.deterministic_results and self.model_revision and self.tokenizer_identity): raise ValueError("result cache requires determinism, revision and tokenizer identity")
         if self.backend == "vllm_systemone" and (self.policy_mode == "coalesced" or self.result_cache or self.template_cache or self.temperature != 1): raise ValueError("SystemOne optimization unsupported")
         if self.policy_mode not in ("reference", "coalesced", "disabled"):
-            raise ValueError("policy_mode must be reference or disabled")
+            raise ValueError("policy_mode must be reference, coalesced or disabled")
         if not isinstance(self.metrics_namespace, str) or not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", self.metrics_namespace):
             raise ValueError("invalid metrics namespace")
         for name in ("model", "upstream_url", "upstream_model", "family", "backend", "host"):

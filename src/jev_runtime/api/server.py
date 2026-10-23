@@ -1,4 +1,5 @@
 import json, socket, threading
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from concurrent.futures import ThreadPoolExecutor
 from ..core.errors import ServiceError
@@ -13,7 +14,7 @@ def strict_json(data):
 class Server(HTTPServer):
     allow_reuse_address=True
     def __init__(self,address,runtime):
-        self.runtime=runtime; limit=runtime.workers+runtime.slots._initial_value+2; self.pool=ThreadPoolExecutor(max_workers=limit,thread_name_prefix='jev-http'); self.connections=threading.BoundedSemaphore(limit); super().__init__(address,Handler)
+        self.runtime=runtime; limit=runtime.workers+runtime.slots._initial_value+2; self.pool=ThreadPoolExecutor(max_workers=limit,thread_name_prefix='light-jevllm-http'); self.connections=threading.BoundedSemaphore(limit); super().__init__(address,Handler)
     def process_request(self,request,address):
         if not self.connections.acquire(False):
             try: request.settimeout(1); request.sendall(b'HTTP/1.0 429 Too Many Requests\r\nContent-Length: 0\r\nConnection: close\r\n\r\n')
@@ -43,6 +44,10 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path=='/health':
                 ready=runtime.ready(); self.send(200 if ready else 503,{'ready':ready})
             elif self.path=='/v1/models': self.send(200,{'object':'list','data':[{'id':runtime.model,'object':'model','family':('systemone' if runtime.backend_name=='vllm_systemone' else runtime.config.family),'backend':runtime.backend_name,'capabilities':runtime.capabilities()}]})
+            elif self.path=='/openapi.yaml':
+                path = Path(__file__).resolve().parents[3] / 'api' / 'openapi.yaml'
+                if not path.is_file(): return self._error(404, 'openapi contract unavailable')
+                self.send(200, path.read_text(encoding='utf-8'), 'application/yaml; charset=utf-8')
             elif self.path=='/metrics': self.send(200,runtime.metrics(),'text/plain; version=0.0.4')
             else:self._error(404,'not found')
         except ServiceError as exc:self._error(exc.status,exc.message)

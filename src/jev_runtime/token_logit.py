@@ -59,8 +59,17 @@ class TokenLogitAdapter:
         compiled = CompiledQuestion(question_id, kind, normalized, instructions)  # type: ignore[arg-type]
         return TokenLogitQuestion(compiled, prompt, tuple(token_ids), tuple(token_texts))
 
-    def decode(self, item: TokenLogitQuestion, logits: Sequence[float]) -> dict[str, Any]:
-        values = tuple(float(value) for value in logits)
+    def decode(
+        self,
+        item: TokenLogitQuestion,
+        logits: Sequence[float],
+        *,
+        temperature: float = 1.0,
+        calibration_version: str | None = None,
+    ) -> dict[str, Any]:
+        if type(temperature) not in (int, float) or not math.isfinite(temperature) or temperature <= 0:
+            raise TokenLogitError("temperature must be finite and positive")
+        values = tuple(float(value) / temperature for value in logits)
         if len(values) != len(item.candidate_ids):
             raise TokenLogitError("backend did not return every candidate logit")
         if any(not math.isfinite(value) for value in values):
@@ -70,7 +79,7 @@ class TokenLogitAdapter:
         confidence = normalized_entropy(probabilities)
         kind = item.question.kind
         common = {"probabilities": probability_map, "confidence": confidence,
-                  "confidence_type": "normalized_entropy", "calibration_version": None}
+                  "confidence_type": "normalized_entropy", "calibration_version": calibration_version}
         if kind == "noul":
             return {"type": "noul", "noul": float(probability_map["true"]), **common}
         if kind == "score":

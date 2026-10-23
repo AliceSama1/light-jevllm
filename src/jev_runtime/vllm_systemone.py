@@ -58,7 +58,7 @@ class VLLMSystemOneBackend:
         self.options = options
         self.closed = False
         self._lock = threading.Lock()
-        self._executor = ThreadPoolExecutor(max_workers=options.max_concurrency, thread_name_prefix="jev-systemone")
+        self._executor = ThreadPoolExecutor(max_workers=options.max_concurrency, thread_name_prefix="light-jevllm-systemone")
 
     def close(self) -> None:
         with self._lock:

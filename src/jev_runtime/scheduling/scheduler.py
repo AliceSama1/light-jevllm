@@ -35,7 +35,8 @@ class RequestScheduler:
         self.condition = threading.Condition()
         self.pending = []
         self.closed = False
-        self.thread = threading.Thread(target=self._run, name='jev-batcher', daemon=True)
+        self.stats_values = {'batches_executed': 0, 'batch_requests': 0, 'batch_rows': 0, 'forward_seconds': 0.0, 'queue_wait_seconds': 0.0}
+        self.thread = threading.Thread(target=self._run, name='light-jevllm-batcher', daemon=True)
         self.thread.start()
 
     def submit(self, key, items, expires):
@@ -86,10 +87,13 @@ class RequestScheduler:
                 self.pending = remaining
             if not batch: continue
             started = time.monotonic()
-            for work in batch: self.observe('queue_wait_seconds_total', started-work.enqueued)
-            self.observe('batches_total', 1)
-            self.observe('batch_requests_total', len(batch))
-            self.observe('batch_rows_total', rows)
+            for work in batch:
+                waited = started-work.enqueued
+                self.stats_values['queue_wait_seconds'] += waited
+                self.observe('queue_wait_seconds_total', waited)
+            self.stats_values['batches_executed'] += 1
+            self.stats_values['batch_requests'] += len(batch)
+            self.stats_values['batch_rows'] += rows
             try:
                 # A short deadline cannot poison a longer-lived peer's result.
                 output = asyncio.run(self.backend.execute([i for w in batch for i in w.items], timeout=max(w.expires for w in batch)-time.monotonic()))
@@ -100,12 +104,19 @@ class RequestScheduler:
                     offset += len(work.items)
             except Exception as exc:
                 for work in batch: self._finish(work, error=exc)
-            finally: self.observe('forward_seconds_total', time.monotonic()-started)
+            finally:
+                elapsed = time.monotonic()-started
+                self.stats_values['forward_seconds'] += elapsed
+                self.observe('forward_seconds_total', elapsed)
 
+    def stats(self):
+        with self.condition:
+            return dict(self.stats_values, pending=len(self.pending))
     def close(self, timeout=5):
         with self.condition:
             self.closed = True
-            for work in self.pending: self._finish(work, error=ServiceError(503, 'scheduler closing'))
+            for work in self.pending:
+                self._finish(work, error=ServiceError(503, 'scheduler closing'))
             self.pending.clear()
             self.condition.notify_all()
         self.thread.join(timeout)
