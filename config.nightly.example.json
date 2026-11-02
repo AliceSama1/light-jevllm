@@ -1,0 +1,22 @@
+{
+  "model": "nightly-control-plane",
+  "upstream_url": "http://127.0.0.1:8000",
+  "upstream_model": "my-vllm-model",
+  "family": "token_logit",
+  "backend": "vllm_nightly",
+  "parallel_protocol_version": "light-jevllm.parallel.v1",
+  "nightly_capability_endpoint": "/light-jevllm/v1/capabilities",
+  "nightly_execute_endpoint": "/light-jevllm/v1/execute",
+  "tensor_parallel": 1,
+  "pipeline_parallel": 1,
+  "data_parallel": 1,
+  "context_parallel": 1,
+  "decode_context_parallel": 1,
+  "host": "127.0.0.1",
+  "port": 8080,
+  "workers": 2,
+  "queue_capacity": 8,
+  "timeout_seconds": 10,
+  "close_timeout_seconds": 5,
+  "max_request_bytes": 1048576
+}
